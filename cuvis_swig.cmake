@@ -1,0 +1,52 @@
+list(APPEND CMAKE_MODULE_PATH
+  "${CMAKE_CURRENT_LIST_DIR}/cuvis.c")
+
+find_package(Cuvis REQUIRED)
+
+set(SWIG_FILES 
+	${CMAKE_CURRENT_LIST_DIR}/src/cuvis_il.i)
+	
+
+CMAKE_POLICY(SET CMP0086 NEW)
+CMAKE_POLICY(SET CMP0078 NEW)
+
+
+FIND_PACKAGE(SWIG REQUIRED)
+INCLUDE(${SWIG_USE_FILE})
+
+
+
+set (UseSWIG_TARGET_NAME_PREFERENCE STANDARD)
+SET_SOURCE_FILES_PROPERTIES(${SWIG_FILES} PROPERTIES CPLUSPLUS ON)
+
+#set(SWIG_OUTPUT_DIR "${EXECUTABLE_OUTPUT_PATH}/intermediate/${target_name}")
+file(MAKE_DIRECTORY ${SWIG_OUTPUT_DIR})
+
+#SET_SOURCE_FILES_PROPERTIES(${PROJECT_SOURCE_DIR}/../swig/measurement.i PROPERTIES SWIG_FLAGS "-includeall")
+SWIG_ADD_LIBRARY(${target_name} LANGUAGE ${SWIG_LANGUAGE} SOURCES ${SWIG_FILES} OUTPUT_DIR ${SWIG_OUTPUT_DIR}  OUTFILE_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated)
+
+#set_property(TARGET ${target_name} PROPERTY SWIG_COMPILE_OPTIONS -namespace cuvis_csharp)
+
+set_PROPERTY(TARGET ${target_name} PROPERTY UseSWIG_MODULE_VERSION 1)
+
+SET_PROPERTY(SOURCE ${target_name} PROPERTY SWIG_MODULE_NAME ${target_name})
+
+get_property(support_files TARGET ${target_name} PROPERTY SWIG_SUPPORT_FILES)
+
+
+SET_PROPERTY(TARGET ${target_name} PROPERTY SWIG_INCLUDE_DIRECTORIES ${CUVIS_INCLUDE_DIR})
+
+get_target_property(
+    MYLIB_SUPPORT_FILES
+    ${target_name}
+    SWIG_SUPPORT_FILES
+)
+
+
+target_link_libraries(${target_name} cuvis) 
+
+target_include_directories(${target_name} INTERFACE
+    ${INTERFACE_OUTPUT_DIR}
+)
+
+
