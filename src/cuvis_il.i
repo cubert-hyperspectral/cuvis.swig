@@ -120,6 +120,33 @@ char const* cuvis_calib_get_id_swig(
 	return ID.c_str();
 }
 
+char const* cuvis_session_file_get_hash_swig(
+    CUVIS_SESSION_FILE i_session)
+{
+	//avoid dangling pointer (invalid pointer) when returnging c_str
+	static std::string hash;
+	CUVIS_CHAR buf[CUVIS_MAXBUF];
+
+	auto status = cuvis_session_file_get_hash(
+	 i_session
+	 , buf
+	);
+
+	if (status != status_ok)
+	{
+		if (status == status_not_available)
+		{
+			buf[0] = '\0';
+		} else {
+		throw std::invalid_argument(cuvis_get_last_error_msg());
+		}
+	}
+
+	hash = std::string(buf);
+
+	return hash.c_str();
+}
+
 char const* cuvis_measurement_get_calib_id_swig(
     CUVIS_MESU i_mesu)
 {
@@ -405,4 +432,5 @@ void cuvis_read_imbuf_float32(struct cuvis_imbuffer_t imbuf, float ** ptr, int *
 %pointer_functions(enum cuvis_data_type_t, p_cuvis_data_type_t); 
 %pointer_functions(enum cuvis_operation_mode_t, p_cuvis_operation_mode_t);
 %pointer_functions(enum cuvis_hardware_state_t, p_cuvis_hardware_state_t);
+%pointer_functions(enum cuvis_status_t, p_cuvis_status_t);
 
