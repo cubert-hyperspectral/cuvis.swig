@@ -1,7 +1,7 @@
 list(APPEND CMAKE_MODULE_PATH
   "${CMAKE_CURRENT_LIST_DIR}/cuvis.c")
 
-find_package(Cuvis 3.2 <3.4 REQUIRED)
+find_package(Cuvis 3.2...<3.4 REQUIRED)
 
 set(SWIG_FILES 
 	${CMAKE_CURRENT_LIST_DIR}/src/cuvis_il.i)
