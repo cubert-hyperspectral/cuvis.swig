@@ -222,12 +222,13 @@ char const* cuvis_measurement_get_data_string_swig(
 {
 	//avoid dangling pointer (invalid pointer) when returnging c_str
 	static std::string value;
-	CUVIS_CHAR buf[CUVIS_MAXBUF];
+	CUVIS_CHAR buf[CUVIS_MAXBUF*8];
 
 	auto status = cuvis_measurement_get_data_string(
 	 i_mesu
 	 , i_key
 	 , buf
+	 , CUVIS_MAXBUF*8
 	);
 
 	if (status != status_ok)
