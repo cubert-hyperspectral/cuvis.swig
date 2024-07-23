@@ -353,6 +353,7 @@ typedef unsigned long long int	uintmax_t;
 
 %include cpointer.i
 %pointer_functions(int, p_int);
+%pointer_functions(unsigned long long, p_ulong);
 //%pointer_functions(unsigned int, p_unsigned_int);
 //%pointer_functions(unsigned char, p_unsigned_char);
 %pointer_functions(double, p_double);
@@ -434,4 +435,5 @@ void cuvis_read_imbuf_float32(struct cuvis_imbuffer_t imbuf, float ** ptr, int *
 %pointer_functions(enum cuvis_operation_mode_t, p_cuvis_operation_mode_t);
 %pointer_functions(enum cuvis_hardware_state_t, p_cuvis_hardware_state_t);
 %pointer_functions(enum cuvis_status_t, p_cuvis_status_t);
+%pointer_functions(struct cuvis_worker_state_t, p_cuvis_worker_state_t);
 
