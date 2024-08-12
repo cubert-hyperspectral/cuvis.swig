@@ -2,6 +2,8 @@
 %ignore cuvis_version;
 %ignore cuvis_measurement_get_data_info;
 %ignore cuvis_measurement_get_data_string;
+%ignore cuvis_acq_cont_get_pixel_format;
+%ignore cuvis_acq_cont_get_available_pixel_format;
 
 //%ignore cuvis_register_external_event_callback;
 //%ignore cuvis_unregister_event_callback;
@@ -230,6 +232,44 @@ char const* cuvis_measurement_get_data_string_swig(
 	 , CUVIS_MAXBUF*8
 	 , buf
 	);
+
+	if (status != status_ok)
+	{
+		throw std::invalid_argument(cuvis_get_last_error_msg());
+	}
+
+	value = std::string(buf);
+
+	return value.c_str();
+}
+
+char const* cuvis_acq_cont_get_pixel_format_swig(
+    CUVIS_ACQ_CONT i_acqCont, CUVIS_INT i_id)
+{
+	//avoid dangling pointer (invalid pointer) when returnging c_str
+	static std::string value;
+	CUVIS_CHAR buf[CUVIS_MAXBUF];
+
+	auto status = cuvis_acq_cont_get_pixel_format(i_acqCont, i_id, buf);
+
+	if (status != status_ok)
+	{
+		throw std::invalid_argument(cuvis_get_last_error_msg());
+	}
+
+	value = std::string(buf);
+
+	return value.c_str();
+}
+
+char const* cuvis_acq_cont_get_available_pixel_format_swig(
+    CUVIS_ACQ_CONT i_acqCont, CUVIS_INT i_id, CUVIS_INT i_index)
+{
+	//avoid dangling pointer (invalid pointer) when returnging c_str
+	static std::string value;
+	CUVIS_CHAR buf[CUVIS_MAXBUF];
+
+	auto status = cuvis_acq_cont_get_available_pixel_format(i_acqCont, i_id, i_index, buf);
 
 	if (status != status_ok)
 	{
