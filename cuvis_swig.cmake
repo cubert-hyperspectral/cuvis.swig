@@ -27,8 +27,6 @@ SET_PROPERTY(SOURCE ${target_name} PROPERTY SWIG_MODULE_NAME ${target_name})
 
 SET_PROPERTY(TARGET ${target_name} PROPERTY SWIG_INCLUDE_DIRECTORIES ${Cuvis_INCLUDE_DIR})
 
-set_property(TARGET ${target_name} PROPERTY SWIG_COMPILE_OPTIONS -doxygen)
-
 target_link_libraries(${target_name} PRIVATE cuvis::c) 
 
 target_include_directories(${target_name} INTERFACE
