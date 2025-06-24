@@ -417,6 +417,7 @@ import_array();
 %apply (unsigned short int** ARGOUTVIEWM_ARRAY3, int * DIM1, int * DIM2, int * DIM3) {(unsigned short int ** ptr, int * X, int * Y, int * Z)};
 %apply (unsigned int** ARGOUTVIEWM_ARRAY3, int * DIM1, int * DIM2, int * DIM3) {(unsigned int ** ptr, int * X, int * Y, int * Z)};
 %apply (float** ARGOUTVIEWM_ARRAY3, int * DIM1, int * DIM2, int * DIM3) {(float ** ptr, int * X, int * Y, int * Z)};
+%apply (unsigned short int *ARGOUT_ARRAY1, int DIM1) { (unsigned short int *data, int n) };
 
 %inline  %{
 void cuvis_read_imbuf_uint8(struct cuvis_imbuffer_t imbuf, unsigned char ** ptr, int * X, int * Y, int * Z)
