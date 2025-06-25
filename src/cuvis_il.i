@@ -417,9 +417,19 @@ import_array();
 %apply (unsigned short int** ARGOUTVIEWM_ARRAY3, int * DIM1, int * DIM2, int * DIM3) {(unsigned short int ** ptr, int * X, int * Y, int * Z)};
 %apply (unsigned int** ARGOUTVIEWM_ARRAY3, int * DIM1, int * DIM2, int * DIM3) {(unsigned int ** ptr, int * X, int * Y, int * Z)};
 %apply (float** ARGOUTVIEWM_ARRAY3, int * DIM1, int * DIM2, int * DIM3) {(float ** ptr, int * X, int * Y, int * Z)};
-%apply (unsigned short int *ARGOUT_ARRAY1, int DIM1) { (unsigned short int *data, int n) };
+%apply (uint32_t  *ARGOUT_ARRAY1, int DIM1) { (uint32_t *data, int n) };
 
 %inline  %{
+
+void cuvis_read_calib_info_wl_vec(struct cuvis_calibration_info_t *info,
+                                  uint32_t **data,
+                                  int *n)
+{
+    *data = info->cube_wavelengths;        /* may be NULL             */
+    *n    = (int)info->cube_channels;      /* number of elements      */
+}
+
+
 void cuvis_read_imbuf_uint8(struct cuvis_imbuffer_t imbuf, unsigned char ** ptr, int * X, int * Y, int * Z)
 {
 	auto len = imbuf.width*imbuf.height*imbuf.channels;
