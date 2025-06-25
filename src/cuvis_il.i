@@ -417,16 +417,17 @@ import_array();
 %apply (unsigned short int** ARGOUTVIEWM_ARRAY3, int * DIM1, int * DIM2, int * DIM3) {(unsigned short int ** ptr, int * X, int * Y, int * Z)};
 %apply (unsigned int** ARGOUTVIEWM_ARRAY3, int * DIM1, int * DIM2, int * DIM3) {(unsigned int ** ptr, int * X, int * Y, int * Z)};
 %apply (float** ARGOUTVIEWM_ARRAY3, int * DIM1, int * DIM2, int * DIM3) {(float ** ptr, int * X, int * Y, int * Z)};
-%apply (uint32_t  *ARGOUT_ARRAY1, int DIM1) { (uint32_t *data, int n) };
+%apply (unsigned int** ARGOUTVIEWM_ARRAY1, int *  DIM1) { (unsigned int ** ptr, int * n) };
 
 %inline  %{
 
-void cuvis_read_calib_info_wl_vec(struct cuvis_calibration_info_t *info,
-                                  uint32_t **data,
+void cuvis_read_calib_info_wl_vec(struct cuvis_calibration_info_t info,
+                                  unsigned int **ptr,
                                   int *n)
 {
-    *data = info->cube_wavelengths;        /* may be NULL             */
-    *n    = (int)info->cube_channels;      /* number of elements      */
+	*ptr = new unsigned int [info.cube_channels];
+	std::memcpy(*ptr,info.cube_wavelengths,info.cube_channels*sizeof(unsigned int));       
+    *n    = (int)info.cube_channels;      
 }
 
 
