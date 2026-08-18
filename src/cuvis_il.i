@@ -68,6 +68,7 @@ public delegate void LogCallbackLocalized(System.IntPtr message, int level);
 %}
 #endif
 
+
  %{
   #define SWIG_FILE_WITH_INIT
  /* Includes the header in the wrapper code */
@@ -78,8 +79,58 @@ public delegate void LogCallbackLocalized(System.IntPtr message, int level);
   #include <stdexcept>
   #include <cstring>
 
+#ifdef _WIN32
+  #include <windows.h>
+  #include <delayimp.h>
+#endif
+
+#ifndef CUVIS_PYIL_BUILT_VERSION
+  #define CUVIS_PYIL_BUILT_VERSION "unknown"
+#endif
+
+/* The one fact the Python layer cannot derive from the binary or the loaded library:
+   which cuvis version this was compiled against. It is what distinguishes "your SDK is
+   older than this binding" from "something else is wrong" when the symbols all resolve. */
+static void cuvis_add_build_info(PyObject* module)
+{
+  PyModule_AddStringConstant(module, "built_against_version", CUVIS_PYIL_BUILT_VERSION);
+}
+
+/* A delay-loaded symbol that the DLL does not export raises an SEH exception and
+   would kill the process. Convert it to a C++ throw, which %exception turns into
+   a Python exception. MSVC forbids __try in a function that needs unwinding, so
+   the throw lives in its own function. */
+#if defined(_MSC_VER)
+static void cuvis_dli_throw()
+{
+  throw std::runtime_error(
+    "cuvis: the loaded cuvis.dll does not export this function "
+    "(the installed CUVIS SDK is older than the one this binding was built against)");
+}
+template <class F> static void cuvis_seh_call(F&& f)
+{
+  __try { f(); }
+  __except ((GetExceptionCode() == VcppException(ERROR_SEVERITY_ERROR, ERROR_PROC_NOT_FOUND) ||
+             GetExceptionCode() == VcppException(ERROR_SEVERITY_ERROR, ERROR_MOD_NOT_FOUND))
+              ? EXCEPTION_EXECUTE_HANDLER : EXCEPTION_CONTINUE_SEARCH)
+  { cuvis_dli_throw(); }
+}
+#  define CUVIS_GUARD(code) cuvis_seh_call([&]{ code });
+#else
+#  define CUVIS_GUARD(code) code
+#endif
 
  %}
+
+// Without this, the throws in the helpers below unwind into CPython with no
+// handler and call std::terminate.
+%include exception.i
+%exception {
+  try { CUVIS_GUARD($action) }
+  catch (std::invalid_argument const& e) { SWIG_exception(SWIG_ValueError,   e.what()); }
+  catch (std::exception const& e)        { SWIG_exception(SWIG_RuntimeError, e.what()); }
+  catch (...)                            { SWIG_exception(SWIG_UnknownError, "unknown C++ exception from cuvis"); }
+}
 
 
 %inline  %{
@@ -411,6 +462,7 @@ typedef unsigned long long int	uintmax_t;
 %include numpy.i
 %init %{
 import_array();
+cuvis_add_build_info(m);
 %}
 
 %apply (unsigned char** ARGOUTVIEWM_ARRAY3, int * DIM1, int * DIM2, int * DIM3) {(unsigned char ** ptr, int * X, int * Y, int * Z)};
@@ -475,7 +527,6 @@ void cuvis_read_imbuf_float32(struct cuvis_imbuffer_t imbuf, float ** ptr, int *
 	*Z = (int)imbuf.channels;
 }
 
-
 %}
 
 #endif
@@ -483,9 +534,18 @@ void cuvis_read_imbuf_float32(struct cuvis_imbuffer_t imbuf, float ** ptr, int *
 %include "cuvis.h"
 
 
-%pointer_functions(enum cuvis_data_type_t, p_cuvis_data_type_t); 
+%pointer_functions(enum cuvis_data_type_t, p_cuvis_data_type_t);
 %pointer_functions(enum cuvis_operation_mode_t, p_cuvis_operation_mode_t);
 %pointer_functions(enum cuvis_hardware_state_t, p_cuvis_hardware_state_t);
 %pointer_functions(enum cuvis_status_t, p_cuvis_status_t);
 %pointer_functions(struct cuvis_worker_state_t, p_cuvis_worker_state_t);
+
+#if !defined(SWIGCSHARP)
+// %init attaches these to _cuvis_pyil; consumers import the cuvis_il proxy.
+// missing_symbols and library_version are added by cuvis_il/__init__.py, which
+// derives them from the built module and the library actually loaded.
+%pythoncode %{
+built_against_version = getattr(_cuvis_pyil, "built_against_version", "")
+%}
+#endif
 
