@@ -68,6 +68,7 @@ public delegate void LogCallbackLocalized(System.IntPtr message, int level);
 %}
 #endif
 
+
  %{
   #define SWIG_FILE_WITH_INIT
  /* Includes the header in the wrapper code */
@@ -78,8 +79,62 @@ public delegate void LogCallbackLocalized(System.IntPtr message, int level);
   #include <stdexcept>
   #include <cstring>
 
+#ifdef _WIN32
+  #include <windows.h>
+  #include <delayimp.h>
+#endif
+
+#ifndef CUVIS_BINDING_BUILT_VERSION
+  #define CUVIS_BINDING_BUILT_VERSION "unknown"
+#endif
+
+/* A delay-loaded symbol that the DLL does not export raises an SEH exception and
+   would kill the process. Convert it to a C++ throw, which %exception turns into
+   a Python exception. MSVC forbids __try in a function that needs unwinding, so
+   the throw lives in its own function. */
+#if defined(_MSC_VER)
+static void cuvis_dli_throw(bool proc_missing)
+{
+  throw std::runtime_error(
+    proc_missing
+      ? "cuvis: the loaded cuvis library does not export this function "
+        "(the installed CUVIS SDK is older than the one this binding was built against)"
+      : "cuvis: the cuvis library could not be loaded (it is missing, or one of its own "
+        "dependencies such as the CUDA runtime cannot be found)");
+}
+template <class F> static void cuvis_seh_call(F&& f)
+{
+  bool proc_missing = false;
+  __try { f(); }
+  __except (((proc_missing = (GetExceptionCode() ==
+                VcppException(ERROR_SEVERITY_ERROR, ERROR_PROC_NOT_FOUND))) ||
+             GetExceptionCode() == VcppException(ERROR_SEVERITY_ERROR, ERROR_MOD_NOT_FOUND))
+              ? EXCEPTION_EXECUTE_HANDLER : EXCEPTION_CONTINUE_SEARCH)
+  { cuvis_dli_throw(proc_missing); }
+}
+#  define CUVIS_GUARD(code) cuvis_seh_call([&]{ code });
+#else
+#  define CUVIS_GUARD(code) code
+#endif
 
  %}
+
+%inline %{
+/* The one fact a caller cannot derive from the binary or from the loaded library:
+   which cuvis version this binding was compiled against. It distinguishes "your SDK
+   is older than this binding" from "something else is wrong" when symbols resolve. */
+const char* cuvis_built_against_version(void) { return CUVIS_BINDING_BUILT_VERSION; }
+%}
+
+// Without this, the throws in the helpers below unwind into the host runtime with no
+// handler and call std::terminate.
+%include exception.i
+%exception {
+  try { CUVIS_GUARD($action) }
+  catch (std::invalid_argument const& e) { SWIG_exception(SWIG_ValueError,   e.what()); }
+  catch (std::exception const& e)        { SWIG_exception(SWIG_RuntimeError, e.what()); }
+  catch (...)                            { SWIG_exception(SWIG_UnknownError, "unknown C++ exception from cuvis"); }
+}
 
 
 %inline  %{
@@ -475,7 +530,6 @@ void cuvis_read_imbuf_float32(struct cuvis_imbuffer_t imbuf, float ** ptr, int *
 	*Z = (int)imbuf.channels;
 }
 
-
 %}
 
 #endif
@@ -483,9 +537,10 @@ void cuvis_read_imbuf_float32(struct cuvis_imbuffer_t imbuf, float ** ptr, int *
 %include "cuvis.h"
 
 
-%pointer_functions(enum cuvis_data_type_t, p_cuvis_data_type_t); 
+%pointer_functions(enum cuvis_data_type_t, p_cuvis_data_type_t);
 %pointer_functions(enum cuvis_operation_mode_t, p_cuvis_operation_mode_t);
 %pointer_functions(enum cuvis_hardware_state_t, p_cuvis_hardware_state_t);
 %pointer_functions(enum cuvis_status_t, p_cuvis_status_t);
 %pointer_functions(struct cuvis_worker_state_t, p_cuvis_worker_state_t);
+
 
