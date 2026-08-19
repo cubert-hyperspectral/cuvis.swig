@@ -117,6 +117,9 @@ template <class F> static void cuvis_seh_call(F&& f)
 #  define CUVIS_GUARD(code) code
 #endif
 
+/* Idempotent, so the same statement serves both the catch blocks and the success path. */
+#define CUVIS_REGAIN_GIL   do { if (_cuvis_thread) { PyEval_RestoreThread(_cuvis_thread); _cuvis_thread = NULL; } } while (0)
+
  %}
 
 %inline %{
@@ -131,11 +134,20 @@ const char* cuvis_built_against_version(void) { return CUVIS_BINDING_BUILT_VERSI
 // Without this, the throws in the helpers below unwind into the host runtime with no
 // handler and call std::terminate.
 %include exception.i
+/* The GIL is released around every call into cuvis, so a blocking wait parks a thread
+   instead of stopping the interpreter. It is released by hand rather than with SWIG's
+   threads="1", whose guard is an RAII object: CUVIS_GUARD unwinds through SEH, and this
+   is built /EHsc, under which MSVC does not run C++ destructors while unwinding an SEH
+   exception. The guard would then never reacquire the GIL and SWIG_exception below would
+   touch the Python C API without it, which is an access violation, not an exception.
+   Restoring in each catch keeps that correct without depending on unwinding at all. */
 %exception {
+  PyThreadState *_cuvis_thread = PyEval_SaveThread();
   try { CUVIS_GUARD($action) }
-  catch (std::invalid_argument const& e) { SWIG_exception(SWIG_ValueError,   e.what()); }
-  catch (std::exception const& e)        { SWIG_exception(SWIG_RuntimeError, e.what()); }
-  catch (...)                            { SWIG_exception(SWIG_UnknownError, "unknown C++ exception from cuvis"); }
+  catch (std::invalid_argument const& e) { CUVIS_REGAIN_GIL; SWIG_exception(SWIG_ValueError,   e.what()); }
+  catch (std::exception const& e)        { CUVIS_REGAIN_GIL; SWIG_exception(SWIG_RuntimeError, e.what()); }
+  catch (...)                            { CUVIS_REGAIN_GIL; SWIG_exception(SWIG_UnknownError, "unknown C++ exception from cuvis"); }
+  CUVIS_REGAIN_GIL;
 }
 
 
