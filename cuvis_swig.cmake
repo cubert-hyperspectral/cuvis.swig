@@ -29,6 +29,15 @@ SET_PROPERTY(TARGET ${target_name} PROPERTY SWIG_INCLUDE_DIRECTORIES ${Cuvis_INC
 
 target_link_libraries(${target_name} PRIVATE cuvis::c) 
 
+# The cuvis library this binding was built against, reported at import time next to the
+# one actually loaded, so a mismatch is visible rather than silent. The whole banner and
+# not just the version: two libraries can report the same version and still be different
+# builds, and keeping both sides in the same form makes them comparable at a glance.
+# Defined here rather than per binding, because the interface file that consumes it is
+# shared by every target language.
+target_compile_definitions(${target_name} PRIVATE
+  CUVIS_BINDING_BUILT_VERSION="${Cuvis_VERSION_STRING}")
+
 target_include_directories(${target_name} INTERFACE
     ${INTERFACE_OUTPUT_DIR}
 )

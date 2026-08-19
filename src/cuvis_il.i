@@ -120,9 +120,11 @@ template <class F> static void cuvis_seh_call(F&& f)
  %}
 
 %inline %{
-/* The one fact a caller cannot derive from the binary or from the loaded library:
-   which cuvis version this binding was compiled against. It distinguishes "your SDK
-   is older than this binding" from "something else is wrong" when symbols resolve. */
+/* The one fact a caller cannot derive from the binary or from the loaded library: which
+   cuvis library this binding was compiled against. Reported in the same form as
+   cuvis_version(), so the two can be held side by side, which is what distinguishes "your
+   SDK is older than this binding" and "your SDK is a different build of the same version"
+   from "something else is wrong" when symbols resolve. */
 const char* cuvis_built_against_version(void) { return CUVIS_BINDING_BUILT_VERSION; }
 %}
 
