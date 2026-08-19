@@ -88,6 +88,10 @@ public delegate void LogCallbackLocalized(System.IntPtr message, int level);
   #define CUVIS_BINDING_BUILT_VERSION "unknown"
 #endif
 
+#ifndef CUVIS_BINDING_BUILT_HASH
+  #define CUVIS_BINDING_BUILT_HASH ""
+#endif
+
 /* A delay-loaded symbol that the DLL does not export raises an SEH exception and
    would kill the process. Convert it to a C++ throw, which %exception turns into
    a Python exception. MSVC forbids __try in a function that needs unwinding, so
@@ -124,6 +128,10 @@ template <class F> static void cuvis_seh_call(F&& f)
    which cuvis version this binding was compiled against. It distinguishes "your SDK
    is older than this binding" from "something else is wrong" when symbols resolve. */
 const char* cuvis_built_against_version(void) { return CUVIS_BINDING_BUILT_VERSION; }
+
+/* Two libraries can report the same version and still be different builds, which the
+   version alone cannot distinguish. Empty when the build did not record a hash. */
+const char* cuvis_built_against_hash(void) { return CUVIS_BINDING_BUILT_HASH; }
 %}
 
 // Without this, the throws in the helpers below unwind into the host runtime with no

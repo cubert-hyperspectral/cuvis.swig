@@ -29,6 +29,14 @@ SET_PROPERTY(TARGET ${target_name} PROPERTY SWIG_INCLUDE_DIRECTORIES ${Cuvis_INC
 
 target_link_libraries(${target_name} PRIVATE cuvis::c) 
 
+# What the binding was built against, reported at import time so a mismatch with the
+# deployed library is visible rather than silent. The version alone does not identify a
+# build, hence the hash. Defined here rather than per binding, because the interface file
+# that consumes it is shared by every target language.
+target_compile_definitions(${target_name} PRIVATE
+  CUVIS_BINDING_BUILT_VERSION="${Cuvis_VERSION}"
+  CUVIS_BINDING_BUILT_HASH="${Cuvis_BUILD_HASH}")
+
 target_include_directories(${target_name} INTERFACE
     ${INTERFACE_OUTPUT_DIR}
 )
