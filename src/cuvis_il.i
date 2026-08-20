@@ -117,6 +117,11 @@ template <class F> static void cuvis_seh_call(F&& f)
 #  define CUVIS_GUARD(code) code
 #endif
 
+#ifdef SWIGPYTHON
+/* Idempotent, so the same statement serves both the catch blocks and the success path. */
+#define CUVIS_REGAIN_GIL   do { if (_cuvis_thread) { PyEval_RestoreThread(_cuvis_thread); _cuvis_thread = NULL; } } while (0)
+#endif
+
  %}
 
 %inline %{
@@ -131,218 +136,179 @@ const char* cuvis_built_against_version(void) { return CUVIS_BINDING_BUILT_VERSI
 // Without this, the throws in the helpers below unwind into the host runtime with no
 // handler and call std::terminate.
 %include exception.i
+/* The GIL is released around every call into cuvis, so a blocking wait parks a thread
+   instead of stopping the interpreter. It is released by hand rather than with SWIG's
+   threads="1", whose guard is an RAII object: CUVIS_GUARD unwinds through SEH, and this
+   is built /EHsc, under which MSVC does not run C++ destructors while unwinding an SEH
+   exception. The guard would then never reacquire the GIL and SWIG_exception below would
+   touch the Python C API without it, which is an access violation, not an exception.
+   Restoring in each catch keeps that correct without depending on unwinding at all. */
+#ifdef SWIGPYTHON
+%exception {
+  PyThreadState *_cuvis_thread = PyEval_SaveThread();
+  try { CUVIS_GUARD($action) }
+  catch (std::invalid_argument const& e) { CUVIS_REGAIN_GIL; SWIG_exception(SWIG_ValueError,   e.what()); }
+  catch (std::exception const& e)        { CUVIS_REGAIN_GIL; SWIG_exception(SWIG_RuntimeError, e.what()); }
+  catch (...)                            { CUVIS_REGAIN_GIL; SWIG_exception(SWIG_UnknownError, "unknown C++ exception from cuvis"); }
+  CUVIS_REGAIN_GIL;
+}
+#else
 %exception {
   try { CUVIS_GUARD($action) }
   catch (std::invalid_argument const& e) { SWIG_exception(SWIG_ValueError,   e.what()); }
   catch (std::exception const& e)        { SWIG_exception(SWIG_RuntimeError, e.what()); }
   catch (...)                            { SWIG_exception(SWIG_UnknownError, "unknown C++ exception from cuvis"); }
 }
+#endif
 
+
+/* std::string rather than char const*: the previous form returned c_str() from a
+   function-local static, which is one buffer shared by every thread in the process. The GIL
+   was the only thing serialising it, so releasing the GIL made two callers overwrite each
+   other and a third read a key that was not its own. Returning by value removes the shared
+   buffer rather than making it per-thread, so a helper added later cannot reintroduce the
+   race by forgetting an annotation. */
+%include <std_string.i>
 
 %inline  %{
-char const* cuvis_version_swig()
+std::string cuvis_version_swig()
 {
-	//avoid dangling pointer (invalid pointer) when returnging c_str
-	static std::string version;
 	CUVIS_CHAR buf[CUVIS_MAXBUF];
-	
-	auto status = cuvis_version(buf);
-	if (status != status_ok)
+
+	if (cuvis_version(buf) != status_ok)
 	{
 		throw std::invalid_argument(cuvis_get_last_error_msg());
 	}
 
-	version = std::string(buf);
-	
-	return version.c_str();
+	return buf;
 }
 
-char const* cuvis_calib_get_id_swig(
+std::string cuvis_calib_get_id_swig(
     CUVIS_CALIB i_calib)
 {
-	//avoid dangling pointer (invalid pointer) when returnging c_str
-	static std::string ID;
 	CUVIS_CHAR buf[CUVIS_MAXBUF];
 
-	auto status = cuvis_calib_get_id(
-	 i_calib
-	 , buf
-	);
-
-	if (status != status_ok)
+	if (cuvis_calib_get_id(i_calib, buf) != status_ok)
 	{
 		throw std::invalid_argument(cuvis_get_last_error_msg());
 	}
 
-	ID = std::string(buf);
-
-	return ID.c_str();
+	return buf;
 }
 
-char const* cuvis_session_file_get_hash_swig(
+std::string cuvis_session_file_get_hash_swig(
     CUVIS_SESSION_FILE i_session)
 {
-	//avoid dangling pointer (invalid pointer) when returnging c_str
-	static std::string hash;
 	CUVIS_CHAR buf[CUVIS_MAXBUF];
 
-	auto status = cuvis_session_file_get_hash(
-	 i_session
-	 , buf
-	);
+	auto status = cuvis_session_file_get_hash(i_session, buf);
 
 	if (status != status_ok)
 	{
+		/* An absent hash is reported as a status, not an error, and reads as empty. */
 		if (status == status_not_available)
 		{
-			buf[0] = '\0';
-		} else {
-		throw std::invalid_argument(cuvis_get_last_error_msg());
+			return std::string();
 		}
+		throw std::invalid_argument(cuvis_get_last_error_msg());
 	}
 
-	hash = std::string(buf);
-
-	return hash.c_str();
+	return buf;
 }
 
-char const* cuvis_measurement_get_calib_id_swig(
+std::string cuvis_measurement_get_calib_id_swig(
     CUVIS_MESU i_mesu)
 {
-	//avoid dangling pointer (invalid pointer) when returnging c_str
-	static std::string ID;
 	CUVIS_CHAR buf[CUVIS_MAXBUF];
 
-	auto status = cuvis_measurement_get_calib_id(
-	 i_mesu
-	 , buf
-	);
-
-	if (status != status_ok)
+	if (cuvis_measurement_get_calib_id(i_mesu, buf) != status_ok)
 	{
 		throw std::invalid_argument(cuvis_get_last_error_msg());
 	}
 
-	ID = std::string(buf);
-
-	return ID.c_str();
+	return buf;
 }
 
-char const* cuvis_proc_cont_get_calib_id_swig(
+std::string cuvis_proc_cont_get_calib_id_swig(
     CUVIS_PROC_CONT i_procCont)
 {
-	//avoid dangling pointer (invalid pointer) when returnging c_str
-	static std::string ID;
 	CUVIS_CHAR buf[CUVIS_MAXBUF];
 
-	auto status = cuvis_proc_cont_get_calib_id(
-	 i_procCont
-	 , buf
-	);
-
-	if (status != status_ok)
+	if (cuvis_proc_cont_get_calib_id(i_procCont, buf) != status_ok)
 	{
 		throw std::invalid_argument(cuvis_get_last_error_msg());
 	}
 
-	ID = std::string(buf);
-
-	return ID.c_str();
+	return buf;
 }
 
-char const* cuvis_measurement_get_data_info_swig(
+std::string cuvis_measurement_get_data_info_swig(
     CUVIS_MESU i_mesu,
     CUVIS_DATA_TYPE* o_pType,
     CUVIS_INT i_id)
 {
-	//avoid dangling pointer (invalid pointer) when returnging c_str
-	static std::string key;
 	CUVIS_CHAR buf[CUVIS_MAXBUF];
 
-	auto status = cuvis_measurement_get_data_info(
-	 i_mesu
-	 , buf
-	 , o_pType
-	 , i_id
-	);
-
-	if (status != status_ok)
+	if (cuvis_measurement_get_data_info(i_mesu, buf, o_pType, i_id) != status_ok)
 	{
 		throw std::invalid_argument(cuvis_get_last_error_msg());
 	}
 
-	key = std::string(buf);
-
-	return key.c_str();
+	return buf;
 }
 
-char const* cuvis_measurement_get_data_string_swig(
+std::string cuvis_measurement_get_data_string_swig(
     CUVIS_MESU i_mesu, const CUVIS_CHAR* i_key)
 {
-	//avoid dangling pointer (invalid pointer) when returnging c_str
-	static std::string value;
-	CUVIS_CHAR buf[CUVIS_MAXBUF*8];
+	/* Sized from the SDK rather than from a fixed buffer. The CUVIS_MAXBUF*8 buffer this
+	   replaced silently truncated longer values, and then read past its own end, because the
+	   SDK writes no terminator when the value fills the buffer exactly: a 3232 byte
+	   settings_rec came back as 2054 bytes ending in uninitialised stack. */
+	CUVIS_SIZE length = 0;
 
-	auto status = cuvis_measurement_get_data_string(
-	 i_mesu
-	 , i_key
-	 , CUVIS_MAXBUF*8
-	 , buf
-	);
-
-	if (status != status_ok)
+	if (cuvis_measurement_get_data_string_length(i_mesu, i_key, &length) != status_ok)
 	{
 		throw std::invalid_argument(cuvis_get_last_error_msg());
 	}
 
-	value = std::string(buf);
+	std::string value;
+	value.resize(length + 1);
 
-	return value.c_str();
+	if (cuvis_measurement_get_data_string(i_mesu, i_key, length + 1, &value[0]) != status_ok)
+	{
+		throw std::invalid_argument(cuvis_get_last_error_msg());
+	}
+
+	value.resize(std::strlen(value.c_str()));
+
+	return value;
 }
 
-char const* cuvis_comp_pixel_format_get_swig(
+std::string cuvis_comp_pixel_format_get_swig(
     CUVIS_ACQ_CONT i_acqCont, CUVIS_INT i_id)
 {
-	//avoid dangling pointer (invalid pointer) when returnging c_str
-	static std::string value;
 	CUVIS_CHAR buf[CUVIS_MAXBUF];
 
-	auto status = cuvis_comp_pixel_format_get(i_acqCont, i_id, buf);
-
-	if (status != status_ok)
+	if (cuvis_comp_pixel_format_get(i_acqCont, i_id, buf) != status_ok)
 	{
 		throw std::invalid_argument(cuvis_get_last_error_msg());
 	}
 
-	value = std::string(buf);
-
-	return value.c_str();
+	return buf;
 }
 
-char const* cuvis_comp_available_pixel_format_get_swig(
+std::string cuvis_comp_available_pixel_format_get_swig(
     CUVIS_ACQ_CONT i_acqCont, CUVIS_INT i_id, CUVIS_INT i_index)
 {
-	//avoid dangling pointer (invalid pointer) when returnging c_str
-	static std::string value;
 	CUVIS_CHAR buf[CUVIS_MAXBUF];
 
-	auto status = cuvis_comp_available_pixel_format_get(i_acqCont, i_id, i_index, buf);
-
-	if (status != status_ok)
+	if (cuvis_comp_available_pixel_format_get(i_acqCont, i_id, i_index, buf) != status_ok)
 	{
 		throw std::invalid_argument(cuvis_get_last_error_msg());
 	}
 
-	value = std::string(buf);
-
-	return value.c_str();
+	return buf;
 }
-/*
-bool p_unsigned_int_notnull(unsigned int * ptr)
-{
-	return (ptr == nullptr);
-}
-*/
 %}
 
   
