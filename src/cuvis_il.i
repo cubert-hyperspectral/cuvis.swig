@@ -448,6 +448,13 @@ void cuvis_read_calib_info_wl_vec(struct cuvis_calibration_info_t info,
                                   unsigned int **ptr,
                                   int *n)
 {
+	// the wavelengths pointer is documented nullable (unknown grid): hand back an empty array
+	if (info.cube_wavelengths == nullptr)
+	{
+		*ptr = new unsigned int [0];
+		*n = 0;
+		return;
+	}
 	*ptr = new unsigned int [info.cube_channels];
 	std::memcpy(*ptr,info.cube_wavelengths,info.cube_channels*sizeof(unsigned int));       
     *n    = (int)info.cube_channels;      
