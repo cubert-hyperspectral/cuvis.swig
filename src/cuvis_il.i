@@ -518,23 +518,23 @@ void cuvis_read_imbuf_float32(struct cuvis_imbuffer_t imbuf, float ** ptr, int *
 
 %inline  %{
 
-int cuvis_proc_cont_set_reference_spectrum_swig(int procCont, float* wls, int n_wls, float* vals, int n_vals)
+int cuvis_proc_cont_set_reference_target_spectrum_swig(int procCont, float* wls, int n_wls, float* vals, int n_vals)
 {
 	if (n_wls != n_vals || n_wls <= 0)
 		return status_error;
-	return cuvis_proc_cont_set_reference_spectrum(procCont, wls, vals, (uint32_t)n_wls);
+	return cuvis_proc_cont_set_reference_target_spectrum(procCont, wls, vals, (uint32_t)n_wls);
 }
 
-int cuvis_proc_cont_set_reference_spectrum_counts_swig(
+int cuvis_proc_cont_set_reference_white_spectrum_swig(
     int procCont, float* wls, int n_wls, unsigned short* counts, int n_counts, int effectiveBitDepth, double integrationTime, double loadLevel)
 {
 	if (n_wls != n_counts || n_wls <= 0)
 		return status_error;
-	return cuvis_proc_cont_set_reference_spectrum_counts(
+	return cuvis_proc_cont_set_reference_white_spectrum(
 	    procCont, wls, counts, (uint32_t)n_wls, (uint16_t)effectiveBitDepth, integrationTime, loadLevel);
 }
 
-int cuvis_proc_cont_get_reference_spectrum_swig(int procCont, float** o_wls, int* o_n_wls, float** o_vals, int* o_n_vals)
+int cuvis_proc_cont_get_reference_target_spectrum_swig(int procCont, float** o_wls, int* o_n_wls, float** o_vals, int* o_n_vals)
 {
 	uint32_t count = 0;
 	auto status = cuvis_proc_cont_get_reference_spectrum_size(procCont, Reference_TargetSpectrum, &count);
@@ -545,11 +545,11 @@ int cuvis_proc_cont_get_reference_spectrum_swig(int procCont, float** o_wls, int
 	*o_n_wls = (int)count;
 	*o_n_vals = (int)count;
 	if (status == status_ok && count > 0)
-		status = cuvis_proc_cont_get_reference_spectrum(procCont, *o_wls, *o_vals, count);
+		status = cuvis_proc_cont_get_reference_target_spectrum(procCont, *o_wls, *o_vals, count);
 	return status;
 }
 
-int cuvis_proc_cont_get_reference_spectrum_counts_swig(int procCont, float** o_wls, int* o_n_wls, unsigned short** o_counts, int* o_n_counts)
+int cuvis_proc_cont_get_reference_white_spectrum_swig(int procCont, float** o_wls, int* o_n_wls, unsigned short** o_counts, int* o_n_counts)
 {
 	uint32_t count = 0;
 	auto status = cuvis_proc_cont_get_reference_spectrum_size(procCont, Reference_WhiteSpectrum, &count);
@@ -560,7 +560,7 @@ int cuvis_proc_cont_get_reference_spectrum_counts_swig(int procCont, float** o_w
 	*o_n_wls = (int)count;
 	*o_n_counts = (int)count;
 	if (status == status_ok && count > 0)
-		status = cuvis_proc_cont_get_reference_spectrum_counts(procCont, *o_wls, *o_counts, count);
+		status = cuvis_proc_cont_get_reference_white_spectrum(procCont, *o_wls, *o_counts, count);
 	return status;
 }
 
