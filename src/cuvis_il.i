@@ -526,12 +526,12 @@ int cuvis_proc_cont_set_reference_target_spectrum_swig(int procCont, float* wls,
 }
 
 int cuvis_proc_cont_set_reference_white_spectrum_swig(
-    int procCont, float* wls, int n_wls, unsigned short* counts, int n_counts, int effectiveBitDepth, double integrationTime, double loadLevel)
+    int procCont, float* wls, int n_wls, unsigned short* counts, int n_counts, int effectiveBitDepth, double integrationTime)
 {
 	if (n_wls != n_counts || n_wls <= 0)
 		return status_error;
 	return cuvis_proc_cont_set_reference_white_spectrum(
-	    procCont, wls, counts, (uint32_t)n_wls, (uint16_t)effectiveBitDepth, integrationTime, loadLevel);
+	    procCont, wls, counts, (uint32_t)n_wls, (uint16_t)effectiveBitDepth, integrationTime);
 }
 
 int cuvis_proc_cont_get_reference_target_spectrum_swig(int procCont, float** o_wls, int* o_n_wls, float** o_vals, int* o_n_vals)
