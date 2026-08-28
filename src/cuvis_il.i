@@ -507,14 +507,16 @@ void cuvis_read_imbuf_float32(struct cuvis_imbuffer_t imbuf, float ** ptr, int *
 
 %}
 
-/* Reference spectra. Shims rather than direct wrapping: the C setters pair two arrays
-   with one shared count, and the C getters use a size-query-then-copy protocol; numpy.i
-   expresses neither directly. The buffers follow the cuvis_read_imbuf_* precedent:
-   new[]ed here, owned by the returned numpy array. */
+/* Reference spectra. Shims rather than direct wrapping: the C surface speaks the
+   pointer-carrying cuvis_sensor_spectrum_t / cuvis_target_spectrum_t structs, whose
+   borrowed getter arrays numpy.i cannot own. The shims copy into new[]ed buffers
+   following the cuvis_read_imbuf_* precedent: owned by the returned numpy array. */
 %apply (float* IN_ARRAY1, int DIM1) {(float* wls, int n_wls), (float* vals, int n_vals)};
 %apply (unsigned short* IN_ARRAY1, int DIM1) {(unsigned short* counts, int n_counts)};
 %apply (float** ARGOUTVIEWM_ARRAY1, int* DIM1) {(float** o_wls, int* o_n_wls), (float** o_vals, int* o_n_vals)};
 %apply (unsigned short** ARGOUTVIEWM_ARRAY1, int* DIM1) {(unsigned short** o_counts, int* o_n_counts)};
+%apply int *OUTPUT {int* o_bit_depth};
+%apply double *OUTPUT {double* o_integration_time};
 
 %inline  %{
 
@@ -522,7 +524,8 @@ int cuvis_proc_cont_set_reference_target_spectrum_swig(int procCont, float* wls,
 {
 	if (n_wls != n_vals || n_wls <= 0)
 		return status_error;
-	return cuvis_proc_cont_set_reference_target_spectrum(procCont, wls, vals, (uint32_t)n_wls);
+	CUVIS_TARGET_SPECTRUM spectrum{wls, vals, (uint32_t)n_wls};
+	return cuvis_proc_cont_set_reference_target_spectrum(procCont, &spectrum);
 }
 
 int cuvis_proc_cont_set_reference_white_spectrum_swig(
@@ -530,37 +533,44 @@ int cuvis_proc_cont_set_reference_white_spectrum_swig(
 {
 	if (n_wls != n_counts || n_wls <= 0)
 		return status_error;
-	return cuvis_proc_cont_set_reference_white_spectrum(
-	    procCont, wls, counts, (uint32_t)n_wls, (uint16_t)effectiveBitDepth, integrationTime);
+	CUVIS_SENSOR_SPECTRUM spectrum{wls, counts, (uint32_t)n_wls, (uint16_t)effectiveBitDepth, integrationTime};
+	return cuvis_proc_cont_set_reference_white_spectrum(procCont, &spectrum);
 }
 
 int cuvis_proc_cont_get_reference_target_spectrum_swig(int procCont, float** o_wls, int* o_n_wls, float** o_vals, int* o_n_vals)
 {
-	uint32_t count = 0;
-	auto status = cuvis_proc_cont_get_reference_spectrum_size(procCont, Reference_TargetSpectrum, &count);
-	if (status != status_ok)
-		count = 0;
+	CUVIS_TARGET_SPECTRUM spectrum{};
+	auto status = cuvis_proc_cont_get_reference_target_spectrum(procCont, &spectrum);
+	uint32_t const count = (status == status_ok) ? spectrum.count : 0;
 	*o_wls = new float[count]();
 	*o_vals = new float[count]();
 	*o_n_wls = (int)count;
 	*o_n_vals = (int)count;
-	if (status == status_ok && count > 0)
-		status = cuvis_proc_cont_get_reference_target_spectrum(procCont, *o_wls, *o_vals, count);
+	if (count > 0)
+	{
+		std::memcpy(*o_wls, spectrum.wavelengths, count * sizeof(float));
+		std::memcpy(*o_vals, spectrum.values, count * sizeof(float));
+	}
 	return status;
 }
 
-int cuvis_proc_cont_get_reference_white_spectrum_swig(int procCont, float** o_wls, int* o_n_wls, unsigned short** o_counts, int* o_n_counts)
+int cuvis_proc_cont_get_reference_white_spectrum_swig(
+    int procCont, float** o_wls, int* o_n_wls, unsigned short** o_counts, int* o_n_counts, int* o_bit_depth, double* o_integration_time)
 {
-	uint32_t count = 0;
-	auto status = cuvis_proc_cont_get_reference_spectrum_size(procCont, Reference_WhiteSpectrum, &count);
-	if (status != status_ok)
-		count = 0;
+	CUVIS_SENSOR_SPECTRUM spectrum{};
+	auto status = cuvis_proc_cont_get_reference_white_spectrum(procCont, &spectrum);
+	uint32_t const count = (status == status_ok) ? spectrum.count : 0;
 	*o_wls = new float[count]();
 	*o_counts = new unsigned short[count]();
 	*o_n_wls = (int)count;
 	*o_n_counts = (int)count;
-	if (status == status_ok && count > 0)
-		status = cuvis_proc_cont_get_reference_white_spectrum(procCont, *o_wls, *o_counts, count);
+	*o_bit_depth = (status == status_ok) ? (int)spectrum.effective_bit_depth : 0;
+	*o_integration_time = (status == status_ok) ? spectrum.integration_time : 0.0;
+	if (count > 0)
+	{
+		std::memcpy(*o_wls, spectrum.wavelengths, count * sizeof(float));
+		std::memcpy(*o_counts, spectrum.values, count * sizeof(unsigned short));
+	}
 	return status;
 }
 
