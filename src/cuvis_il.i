@@ -448,6 +448,13 @@ void cuvis_read_calib_info_wl_vec(struct cuvis_calibration_info_t info,
                                   unsigned int **ptr,
                                   int *n)
 {
+	// the wavelengths pointer is documented nullable (unknown grid): hand back an empty array
+	if (info.cube_wavelengths == nullptr)
+	{
+		*ptr = new unsigned int [0];
+		*n = 0;
+		return;
+	}
 	*ptr = new unsigned int [info.cube_channels];
 	std::memcpy(*ptr,info.cube_wavelengths,info.cube_channels*sizeof(unsigned int));       
     *n    = (int)info.cube_channels;      
@@ -496,6 +503,75 @@ void cuvis_read_imbuf_float32(struct cuvis_imbuffer_t imbuf, float ** ptr, int *
 	*Y = (int)imbuf.width;
 	*X = (int)imbuf.height;
 	*Z = (int)imbuf.channels;
+}
+
+%}
+
+/* Reference spectra. Shims rather than direct wrapping: the C surface speaks the
+   pointer-carrying cuvis_sensor_spectrum_t / cuvis_target_spectrum_t structs, whose
+   borrowed getter arrays numpy.i cannot own. The shims copy into new[]ed buffers
+   following the cuvis_read_imbuf_* precedent: owned by the returned numpy array. */
+%apply (float* IN_ARRAY1, int DIM1) {(float* wls, int n_wls), (float* vals, int n_vals)};
+%apply (unsigned short* IN_ARRAY1, int DIM1) {(unsigned short* counts, int n_counts)};
+%apply (float** ARGOUTVIEWM_ARRAY1, int* DIM1) {(float** o_wls, int* o_n_wls), (float** o_vals, int* o_n_vals)};
+%apply (unsigned short** ARGOUTVIEWM_ARRAY1, int* DIM1) {(unsigned short** o_counts, int* o_n_counts)};
+%apply int *OUTPUT {int* o_bit_depth};
+%apply double *OUTPUT {double* o_integration_time};
+
+%inline  %{
+
+int cuvis_proc_cont_set_reference_target_spectrum_swig(int procCont, float* wls, int n_wls, float* vals, int n_vals)
+{
+	if (n_wls != n_vals || n_wls <= 0)
+		return status_error;
+	CUVIS_TARGET_SPECTRUM spectrum{wls, vals, (uint32_t)n_wls};
+	return cuvis_proc_cont_set_reference_target_spectrum(procCont, &spectrum);
+}
+
+int cuvis_proc_cont_set_reference_white_spectrum_swig(
+    int procCont, float* wls, int n_wls, unsigned short* counts, int n_counts, int effectiveBitDepth, double integrationTime)
+{
+	if (n_wls != n_counts || n_wls <= 0)
+		return status_error;
+	CUVIS_SENSOR_SPECTRUM spectrum{wls, counts, (uint32_t)n_wls, (uint16_t)effectiveBitDepth, integrationTime};
+	return cuvis_proc_cont_set_reference_white_spectrum(procCont, &spectrum);
+}
+
+int cuvis_proc_cont_get_reference_target_spectrum_swig(int procCont, float** o_wls, int* o_n_wls, float** o_vals, int* o_n_vals)
+{
+	CUVIS_TARGET_SPECTRUM spectrum{};
+	auto status = cuvis_proc_cont_get_reference_target_spectrum(procCont, &spectrum);
+	uint32_t const count = (status == status_ok) ? spectrum.count : 0;
+	*o_wls = new float[count]();
+	*o_vals = new float[count]();
+	*o_n_wls = (int)count;
+	*o_n_vals = (int)count;
+	if (count > 0)
+	{
+		std::memcpy(*o_wls, spectrum.wavelengths, count * sizeof(float));
+		std::memcpy(*o_vals, spectrum.values, count * sizeof(float));
+	}
+	return status;
+}
+
+int cuvis_proc_cont_get_reference_white_spectrum_swig(
+    int procCont, float** o_wls, int* o_n_wls, unsigned short** o_counts, int* o_n_counts, int* o_bit_depth, double* o_integration_time)
+{
+	CUVIS_SENSOR_SPECTRUM spectrum{};
+	auto status = cuvis_proc_cont_get_reference_white_spectrum(procCont, &spectrum);
+	uint32_t const count = (status == status_ok) ? spectrum.count : 0;
+	*o_wls = new float[count]();
+	*o_counts = new unsigned short[count]();
+	*o_n_wls = (int)count;
+	*o_n_counts = (int)count;
+	*o_bit_depth = (status == status_ok) ? (int)spectrum.effective_bit_depth : 0;
+	*o_integration_time = (status == status_ok) ? spectrum.integration_time : 0.0;
+	if (count > 0)
+	{
+		std::memcpy(*o_wls, spectrum.wavelengths, count * sizeof(float));
+		std::memcpy(*o_counts, spectrum.values, count * sizeof(unsigned short));
+	}
+	return status;
 }
 
 %}
