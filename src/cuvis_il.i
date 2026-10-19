@@ -587,4 +587,68 @@ int cuvis_proc_cont_get_reference_white_spectrum_swig(
 %pointer_functions(enum cuvis_status_t, p_cuvis_status_t);
 %pointer_functions(struct cuvis_worker_state_t, p_cuvis_worker_state_t);
 
+#if defined(SWIGCSHARP)
+/* Reference spectra. The getters borrow SDK memory that the struct proxies cannot hand to
+   C#, so these shims copy into caller-owned arrays instead: call with a capacity of 0 to
+   learn the count, then again with arrays of that length. An empty slot reports
+   status_not_available and a count of 0. */
+%include arrays_csharp.i
+%apply float INPUT[] {float* i_wavelengths, float* i_values};
+%apply unsigned short INPUT[] {unsigned short* i_counts};
+%apply float OUTPUT[] {float* o_wavelengths, float* o_values};
+%apply unsigned short OUTPUT[] {unsigned short* o_counts};
+%apply int *OUTPUT {int* o_count, int* o_effectiveBitDepth};
+%apply double *OUTPUT {double* o_integrationTime};
 
+%inline %{
+
+CUVIS_STATUS cuvis_proc_cont_set_reference_target_spectrum_swig(
+    CUVIS_PROC_CONT i_procCont, float* i_wavelengths, float* i_values, int i_count)
+{
+	CUVIS_TARGET_SPECTRUM spectrum{i_wavelengths, i_values, (uint32_t)i_count};
+	return cuvis_proc_cont_set_reference_target_spectrum(i_procCont, &spectrum);
+}
+
+CUVIS_STATUS cuvis_proc_cont_set_reference_white_spectrum_swig(
+    CUVIS_PROC_CONT i_procCont, float* i_wavelengths, unsigned short* i_counts, int i_count,
+    int i_effectiveBitDepth, double i_integrationTime)
+{
+	CUVIS_SENSOR_SPECTRUM spectrum{
+	    i_wavelengths, i_counts, (uint32_t)i_count, (uint16_t)i_effectiveBitDepth, i_integrationTime};
+	return cuvis_proc_cont_set_reference_white_spectrum(i_procCont, &spectrum);
+}
+
+CUVIS_STATUS cuvis_proc_cont_get_reference_target_spectrum_swig(
+    CUVIS_PROC_CONT i_procCont, float* o_wavelengths, float* o_values, int i_capacity, int* o_count)
+{
+	CUVIS_TARGET_SPECTRUM spectrum{};
+	auto status = cuvis_proc_cont_get_reference_target_spectrum(i_procCont, &spectrum);
+	*o_count = (status == status_ok) ? (int)spectrum.count : 0;
+	if (*o_count > 0 && i_capacity >= *o_count)
+	{
+		std::memcpy(o_wavelengths, spectrum.wavelengths, *o_count * sizeof(float));
+		std::memcpy(o_values, spectrum.values, *o_count * sizeof(float));
+	}
+	return status;
+}
+
+CUVIS_STATUS cuvis_proc_cont_get_reference_white_spectrum_swig(
+    CUVIS_PROC_CONT i_procCont, float* o_wavelengths, unsigned short* o_counts, int i_capacity, int* o_count,
+    int* o_effectiveBitDepth, double* o_integrationTime)
+{
+	CUVIS_SENSOR_SPECTRUM spectrum{};
+	auto status = cuvis_proc_cont_get_reference_white_spectrum(i_procCont, &spectrum);
+	bool const ok = (status == status_ok);
+	*o_count = ok ? (int)spectrum.count : 0;
+	*o_effectiveBitDepth = ok ? (int)spectrum.effective_bit_depth : 0;
+	*o_integrationTime = ok ? spectrum.integration_time : 0.0;
+	if (*o_count > 0 && i_capacity >= *o_count)
+	{
+		std::memcpy(o_wavelengths, spectrum.wavelengths, *o_count * sizeof(float));
+		std::memcpy(o_counts, spectrum.values, *o_count * sizeof(unsigned short));
+	}
+	return status;
+}
+
+%}
+#endif
